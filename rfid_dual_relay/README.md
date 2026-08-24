@@ -1,6 +1,6 @@
 # Nano RFID two-relay controller
 
-This Arduino Nano sketch is a basic two-room electricity controller. It reads an RC522 RFID/NFC card UID; scanning an approved card toggles its assigned relay **ON** or **OFF**. Both relays start OFF after reset or power loss.
+This Arduino Nano sketch saves every newly scanned RC522 RFID/NFC card UID in Arduino Nano EEPROM. A saved card toggles Relay 1 **ON** or **OFF**. Saved UIDs survive reset and power loss; Relay 1 itself starts OFF after reset or power loss.
 
 ## Wiring
 
@@ -32,18 +32,13 @@ The Nano and RC522 must never be connected directly to AC mains. The relay's `CO
 1. In Arduino IDE, install **MFRC522** from Library Manager (author: GithubCommunity).
 2. Open `rfid_dual_relay.ino`, select **Arduino Nano** and its processor/port, then upload.
 3. Open Serial Monitor at **115200 baud** and scan each card.
-4. Copy the printed UID into `CARD_RELAY_1` or `CARD_RELAY_2`. Keep the `0x` prefix and use the exact UID byte count.
-5. Upload again.
-
-Example: output `Card UID: 04 A1 B2 C3 D4 E5 F6` becomes:
-
-```cpp
-const byte CARD_RELAY_1[] = {0x04, 0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6};
-```
+4. Scan a card. Its UID is saved automatically and it immediately controls Relay 1.
 
 The sketch assumes the common **active-LOW** relay modules. If yours turns on when it should be off, change `RELAY_ACTIVE_LOW` to `false`.
 
-Each authorized card is mapped to one relay in `allowedCards`. Scan its card once to turn that room circuit ON; scan it again to turn it OFF. The state is not remembered after the Nano loses power, so both circuits will start OFF.
+The sketch saves up to 80 card UIDs. Scan any card once to save it; scan it again to turn the room circuit ON or OFF. The card list is remembered after a power loss, but the relay state is not—Relay 1 starts OFF. To erase all saved cards, temporarily set `CLEAR_SAVED_CARDS_ON_BOOT` to `true`, upload the sketch once, then set it to `false` and upload again.
+
+Because any new card is automatically approved, only use this mode in a trusted/private place.
 
 ## Notes on Android NFC
 

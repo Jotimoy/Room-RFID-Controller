@@ -1,54 +1,53 @@
 /*
-  Arduino Nano + RC522 RFID reader + two relay modules
+  Arduino Nano + RC522 RFID reader + room electricity relay controller
 
-  Scan an approved RFID/NFC card to toggle its assigned room relay ON/OFF.
-  Unknown cards are not allowed; their UID is printed in the Serial Monitor.
+  Every new card scanned is automatically saved in the Arduino Nano EEPROM.
+  Every saved card toggles Relay 1 ON/OFF. Saved cards remain after power loss.
 
   Required Arduino library: MFRC522 by GithubCommunity
 */
 
 #include <SPI.h>
+#include <EEPROM.h>
 #include <MFRC522.h>
 
 // RC522 SPI wiring for Arduino Nano (ATmega328P).
 constexpr byte SS_PIN = 10;
 constexpr byte RST_PIN = 9;
-
-// Relay inputs. Change these if your wiring is different.
 constexpr byte RELAY_1_PIN = 6;
-constexpr byte RELAY_2_PIN = 7;
+constexpr byte RELAY_2_PIN = 7;  // Not used in automatic Relay 1 mode.
 
 // Most relay modules are active LOW. Set to false for an active-HIGH module.
 constexpr bool RELAY_ACTIVE_LOW = true;
-
 constexpr unsigned long SAME_CARD_COOLDOWN_MS = 3000;
+
+// Change to true, upload once, and reset the Nano to remove every saved card.
+// Immediately change it back to false and upload again afterwards.
+constexpr bool CLEAR_SAVED_CARDS_ON_BOOT = false;
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
-struct CardAccess {
-  const byte *uid;
+constexpr byte EEPROM_MAGIC_1 = 0x52;
+constexpr byte EEPROM_MAGIC_2 = 0x46;
+constexpr int EEPROM_HEADER_SIZE = 2;
+constexpr byte UID_MAX_BYTES = 10;
+constexpr byte MAX_SAVED_CARDS = 80;  // Uses 882 of the Nano's 1024 EEPROM bytes.
+
+struct StoredCard {
   byte uidSize;
-  byte relayPin;
-  const char *name;
+  byte uid[UID_MAX_BYTES];
 };
 
-// Approved card UIDs. UID length may be 4, 7, or 10 bytes.
-const byte CARD_RELAY_1[] = {0x0A, 0x96, 0xC1, 0xE1};
-const byte CARD_RELAY_2[] = {0x83, 0x54, 0x6A, 0x28};
-
-const CardAccess allowedCards[] = {
-  {CARD_RELAY_1, sizeof(CARD_RELAY_1), RELAY_1_PIN, "Room 1 card"},
-  {CARD_RELAY_2, sizeof(CARD_RELAY_2), RELAY_2_PIN, "Room 2 card"},
-};
-
-constexpr byte CARD_COUNT = sizeof(allowedCards) / sizeof(allowedCards[0]);
+constexpr int CARD_SLOT_SIZE = sizeof(StoredCard);
 
 bool relay1On = false;
-bool relay2On = false;
-// RC522 can report UIDs up to 10 bytes long.
-byte lastUid[10];
+byte lastUid[UID_MAX_BYTES];
 byte lastUidSize = 0;
 unsigned long lastScanAt = 0;
+
+int cardAddress(byte index) {
+  return EEPROM_HEADER_SIZE + (index * CARD_SLOT_SIZE);
+}
 
 void setRelay(byte pin, bool on) {
   const byte level = (on == RELAY_ACTIVE_LOW) ? LOW : HIGH;
@@ -63,19 +62,57 @@ void printUid(const MFRC522::Uid &uid) {
   }
 }
 
-bool uidMatches(const MFRC522::Uid &scanned, const CardAccess &card) {
-  if (scanned.size != card.uidSize) return false;
+bool validUidSize(byte size) {
+  return size == 4 || size == 7 || size == 10;
+}
+
+bool uidMatches(const MFRC522::Uid &scanned, const StoredCard &saved) {
+  if (!validUidSize(saved.uidSize) || scanned.size != saved.uidSize) return false;
   for (byte i = 0; i < scanned.size; i++) {
-    if (scanned.uidByte[i] != card.uid[i]) return false;
+    if (scanned.uidByte[i] != saved.uid[i]) return false;
   }
   return true;
 }
 
-const CardAccess *findCard(const MFRC522::Uid &scanned) {
-  for (byte i = 0; i < CARD_COUNT; i++) {
-    if (uidMatches(scanned, allowedCards[i])) return &allowedCards[i];
+bool cardIsSaved(const MFRC522::Uid &scanned) {
+  StoredCard saved;
+  for (byte i = 0; i < MAX_SAVED_CARDS; i++) {
+    EEPROM.get(cardAddress(i), saved);
+    if (uidMatches(scanned, saved)) return true;
   }
-  return nullptr;
+  return false;
+}
+
+bool saveCard(const MFRC522::Uid &scanned) {
+  StoredCard saved;
+  for (byte i = 0; i < MAX_SAVED_CARDS; i++) {
+    const int address = cardAddress(i);
+    EEPROM.get(address, saved);
+    if (!validUidSize(saved.uidSize)) {
+      saved.uidSize = scanned.size;
+      for (byte j = 0; j < UID_MAX_BYTES; j++) {
+        saved.uid[j] = (j < scanned.size) ? scanned.uidByte[j] : 0;
+      }
+      EEPROM.put(address, saved);
+      return true;
+    }
+  }
+  return false;
+}
+
+void clearSavedCards() {
+  for (byte i = 0; i < MAX_SAVED_CARDS; i++) EEPROM.update(cardAddress(i), 0);
+  Serial.println(F("All saved RFID cards were erased."));
+}
+
+void initialiseCardStorage() {
+  const bool validStorage = EEPROM.read(0) == EEPROM_MAGIC_1 &&
+                            EEPROM.read(1) == EEPROM_MAGIC_2;
+  if (!validStorage || CLEAR_SAVED_CARDS_ON_BOOT) {
+    EEPROM.update(0, EEPROM_MAGIC_1);
+    EEPROM.update(1, EEPROM_MAGIC_2);
+    clearSavedCards();
+  }
 }
 
 bool sameAsLastCard(const MFRC522::Uid &scanned) {
@@ -92,14 +129,10 @@ void rememberCard(const MFRC522::Uid &scanned) {
   lastScanAt = millis();
 }
 
-void toggleRelay(byte pin) {
-  bool *state = (pin == RELAY_1_PIN) ? &relay1On : &relay2On;
-  *state = !*state;
-  setRelay(pin, *state);
-
-  Serial.print(F("Relay "));
-  Serial.print((pin == RELAY_1_PIN) ? 1 : 2);
-  Serial.println(*state ? F(" ON") : F(" OFF"));
+void toggleRelay1() {
+  relay1On = !relay1On;
+  setRelay(RELAY_1_PIN, relay1On);
+  Serial.println(relay1On ? F("Room electricity ON") : F("Room electricity OFF"));
 }
 
 void setup() {
@@ -109,10 +142,11 @@ void setup() {
   setRelay(RELAY_1_PIN, false);
   setRelay(RELAY_2_PIN, false);
 
+  initialiseCardStorage();
   SPI.begin();
   rfid.PCD_Init();
-  Serial.println(F("RFID dual-relay controller ready."));
-  Serial.println(F("Scan a card; copy the printed UID into allowedCards."));
+  Serial.println(F("RFID room controller ready."));
+  Serial.println(F("New cards are automatically saved for Relay 1."));
 }
 
 void loop() {
@@ -128,13 +162,14 @@ void loop() {
   rememberCard(scanned);
 
   if (!duplicate) {
-    const CardAccess *card = findCard(scanned);
-    if (card != nullptr) {
-      Serial.print(F("Access granted: "));
-      Serial.println(card->name);
-      toggleRelay(card->relayPin);
+    if (cardIsSaved(scanned)) {
+      Serial.println(F("Saved card: access granted."));
+      toggleRelay1();
+    } else if (saveCard(scanned)) {
+      Serial.println(F("New card saved: access granted."));
+      toggleRelay1();
     } else {
-      Serial.println(F("Access denied. Add this UID to allowedCards if approved."));
+      Serial.println(F("Card memory is full; no new card was saved."));
     }
   }
 

@@ -2,15 +2,15 @@
 
 An Arduino Nano project that uses an RC522 RFID/NFC reader to control two room electricity circuits through a 2-channel relay module.
 
-Scan an approved RFID card to toggle its assigned room **ON** or **OFF**.
+Scan any RFID card once to save it automatically. After that, scanning a saved card toggles the room electricity **ON** or **OFF**.
 
 ## Features
 
-- Controls two separate room circuits
+- Controls one room circuit through Relay 1
 - Uses Arduino Nano and RC522 RFID reader
-- Each RFID card can be assigned to Relay 1 or Relay 2
-- Unknown cards are denied and their UID is shown in Serial Monitor
-- Relays start in the OFF state after reset or power loss
+- New RFID cards save automatically in the Nano EEPROM (up to 80 cards)
+- Saved card IDs remain saved after reset or power loss
+- Relay starts in the OFF state after reset or power loss
 - Prevents repeated toggles when a card remains on the reader
 
 ## Hardware required
@@ -41,7 +41,7 @@ Scan an approved RFID card to toggle its assigned room **ON** or **OFF**.
 | Relay module pin | Arduino Nano pin |
 | --- | --- |
 | IN1 | D6 |
-| IN2 | D7 |
+| IN2 | D7 (reserved; not used in current automatic-save mode) |
 | GND | GND |
 | VCC | 5V, according to your relay module |
 
@@ -53,31 +53,18 @@ Scan an approved RFID card to toggle its assigned room **ON** or **OFF**.
 4. Select **Arduino Nano** and the correct processor and serial port.
 5. Upload the sketch.
 6. Open Serial Monitor at **115200 baud** and scan each RFID card.
-7. Copy the UID shown in Serial Monitor into the card list in the sketch, then upload again.
-
-Example UID output:
-
-```text
-Card UID: 04 A1 B2 C3 D4 E5 F6
-```
-
-Add it to the code like this:
-
-```cpp
-const byte CARD_RELAY_1[] = {0x04, 0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6};
-```
+7. Scan a card. It is automatically saved in the Nano EEPROM and can immediately control Relay 1.
 
 ## How it works
 
 | Card | Action |
 | --- | --- |
-| Card assigned to Relay 1 | Toggles Room 1 electricity ON/OFF |
-| Card assigned to Relay 2 | Toggles Room 2 electricity ON/OFF |
-| Unknown card | No action; access denied |
+| New card | Saves its UID automatically, then toggles Relay 1 |
+| Saved card | Toggles Room electricity ON/OFF |
 
 ## Important safety notice
 
-This project must **not** connect the Arduino or RC522 directly to AC mains electricity. Use a relay rated for the voltage, current, and type of electrical load. Put all mains wiring in a proper insulated enclosure and use a qualified electrician for fixed building wiring. For high-power room loads, use an appropriately rated contactor.
+This project must **not** connect the Arduino or RC522 directly to AC mains electricity. Use a relay rated for the voltage, current, and type of electrical load. Put all mains wiring in a proper insulated enclosure and use a qualified electrician for fixed building wiring. For high-power room loads, use an appropriately rated contactor. Because every new card is accepted automatically, this mode is not suitable for a public or high-security location.
 
 The RC522 must be powered from **3.3V only**.
 
