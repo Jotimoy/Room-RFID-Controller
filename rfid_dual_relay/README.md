@@ -4,6 +4,10 @@ This Arduino Nano sketch saves every newly scanned RC522 RFID/NFC card UID in Ar
 
 ## Wiring
 
+![Low-voltage hardware wiring diagram](../hardware-wiring-diagram.svg)
+
+This diagram shows only the low-voltage control wiring.
+
 | RC522 | Arduino Nano |
 | --- | --- |
 | 3.3V | 3.3V |

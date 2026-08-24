@@ -24,6 +24,10 @@ Scan any RFID card once to save it automatically. After that, scanning a saved c
 
 ## Wiring
 
+![Low-voltage hardware wiring diagram](hardware-wiring-diagram.svg)
+
+This diagram shows only the low-voltage control wiring. Keep AC mains/load wiring inside a suitable enclosure and have it completed by a qualified electrician.
+
 ### RC522 to Arduino Nano
 
 | RC522 pin | Arduino Nano pin |
