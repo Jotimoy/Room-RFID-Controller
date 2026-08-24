@@ -1,7 +1,7 @@
 /*
   Arduino Nano + RC522 RFID reader + two relay modules
 
-  Scan an approved RFID/NFC card to pulse its assigned relay.
+  Scan an approved RFID/NFC card to toggle its assigned room relay ON/OFF.
   Unknown cards are not allowed; their UID is printed in the Serial Monitor.
 
   Required Arduino library: MFRC522 by GithubCommunity
@@ -21,7 +21,6 @@ constexpr byte RELAY_2_PIN = 7;
 // Most relay modules are active LOW. Set to false for an active-HIGH module.
 constexpr bool RELAY_ACTIVE_LOW = true;
 
-constexpr unsigned long RELAY_PULSE_MS = 2000;
 constexpr unsigned long SAME_CARD_COOLDOWN_MS = 3000;
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -45,8 +44,8 @@ const CardAccess allowedCards[] = {
 
 constexpr byte CARD_COUNT = sizeof(allowedCards) / sizeof(allowedCards[0]);
 
-byte activeRelayPin = 0;
-unsigned long relayOffAt = 0;
+bool relay1On = false;
+bool relay2On = false;
 // RC522 can report UIDs up to 10 bytes long.
 byte lastUid[10];
 byte lastUidSize = 0;
@@ -94,11 +93,14 @@ void rememberCard(const MFRC522::Uid &scanned) {
   lastScanAt = millis();
 }
 
-void pulseRelay(byte pin) {
-  if (activeRelayPin != 0) setRelay(activeRelayPin, false);
-  setRelay(pin, true);
-  activeRelayPin = pin;
-  relayOffAt = millis() + RELAY_PULSE_MS;
+void toggleRelay(byte pin) {
+  bool *state = (pin == RELAY_1_PIN) ? &relay1On : &relay2On;
+  *state = !*state;
+  setRelay(pin, *state);
+
+  Serial.print(F("Relay "));
+  Serial.print((pin == RELAY_1_PIN) ? 1 : 2);
+  Serial.println(*state ? F(" ON") : F(" OFF"));
 }
 
 void setup() {
@@ -115,11 +117,6 @@ void setup() {
 }
 
 void loop() {
-  if (activeRelayPin != 0 && (long)(millis() - relayOffAt) >= 0) {
-    setRelay(activeRelayPin, false);
-    activeRelayPin = 0;
-  }
-
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) return;
 
   const MFRC522::Uid &scanned = rfid.uid;
@@ -136,7 +133,7 @@ void loop() {
     if (card != nullptr) {
       Serial.print(F("Access granted: "));
       Serial.println(card->name);
-      pulseRelay(card->relayPin);
+      toggleRelay(card->relayPin);
     } else {
       Serial.println(F("Access denied. Add this UID to allowedCards if approved."));
     }

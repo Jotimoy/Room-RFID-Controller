@@ -1,6 +1,6 @@
 # Nano RFID two-relay controller
 
-This Arduino Nano sketch reads an RC522 RFID/NFC card UID and pulses the relay assigned to that UID for two seconds.
+This Arduino Nano sketch is a basic two-room electricity controller. It reads an RC522 RFID/NFC card UID; scanning an approved card toggles its assigned relay **ON** or **OFF**. Both relays start OFF after reset or power loss.
 
 ## Wiring
 
@@ -21,7 +21,11 @@ This Arduino Nano sketch reads an RC522 RFID/NFC card UID and pulses the relay a
 | GND | GND (shared with Nano) |
 | VCC | 5V relay supply, per module rating |
 
-**Important:** Power the RC522 from **3.3V only**. Do not connect its signal pins to 5V. Relay modules and the lock/load need an adequate separate power supply; share ground with the Nano where the relay module requires it.
+**Important:** Power the RC522 from **3.3V only**. Do not connect its signal pins to 5V. Relay modules and the load need an adequate separate power supply; share ground with the Nano where the relay module requires it.
+
+## Mains electricity safety
+
+The Nano and RC522 must never be connected directly to AC mains. The relay's `COM`/`NO` terminals may switch a mains-powered room circuit only if the relay is rated for the circuit's voltage, current, and load type, and it is installed in a proper insulated electrical enclosure with suitable fuse/breaker protection. Use a qualified electrician for any fixed building wiring. For higher-power loads, use the relay to control a correctly rated contactor rather than switching the load directly.
 
 ## Install and upload
 
@@ -38,6 +42,8 @@ const byte CARD_RELAY_1[] = {0x04, 0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6};
 ```
 
 The sketch assumes the common **active-LOW** relay modules. If yours turns on when it should be off, change `RELAY_ACTIVE_LOW` to `false`.
+
+Each authorized card is mapped to one relay in `allowedCards`. Scan its card once to turn that room circuit ON; scan it again to turn it OFF. The state is not remembered after the Nano loses power, so both circuits will start OFF.
 
 ## Notes on Android NFC
 
