@@ -32,14 +32,13 @@ struct CardAccess {
   const char *name;
 };
 
-// Replace the example values with the UIDs printed for your cards.
-// UID length may be 4, 7, or 10 bytes; use exactly the length printed.
-const byte CARD_RELAY_1[] = {0xDE, 0xAD, 0xBE, 0xEF};
-const byte CARD_RELAY_2[] = {0x12, 0x34, 0x56, 0x78};
+// Approved card UIDs. UID length may be 4, 7, or 10 bytes.
+const byte CARD_RELAY_1[] = {0x0A, 0x96, 0xC1, 0xE1};
+const byte CARD_RELAY_2[] = {0x83, 0x54, 0x6A, 0x28};
 
 const CardAccess allowedCards[] = {
-  {CARD_RELAY_1, sizeof(CARD_RELAY_1), RELAY_1_PIN, "Relay 1 card"},
-  {CARD_RELAY_2, sizeof(CARD_RELAY_2), RELAY_2_PIN, "Relay 2 card"},
+  {CARD_RELAY_1, sizeof(CARD_RELAY_1), RELAY_1_PIN, "Room 1 card"},
+  {CARD_RELAY_2, sizeof(CARD_RELAY_2), RELAY_2_PIN, "Room 2 card"},
 };
 
 constexpr byte CARD_COUNT = sizeof(allowedCards) / sizeof(allowedCards[0]);
